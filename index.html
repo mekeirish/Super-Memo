@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SkeuoGrid Studio Pro - Haptic & Sound</title>
+    <style>
+        :root {
+            --tile-size: 60px;
+            --gap-size: 2px;
+            --led-red: #ff3030;
+            --led-green: #39ff14;
+            --led-blue: #00d4ff;
+            --radius: 12px;
+        }
+
+        * { box-sizing: border-box; touch-action: none; -webkit-user-select: none; }
+
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at center, #151619 0%, #050505 100%);
+            color: #ddd; overflow: hidden;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        #viewport { width: 100vw; height: 100vh; position: relative; overflow: hidden; cursor: crosshair; }
+        #viewport.grabbing { cursor: grabbing; }
+
+        #pan-zoom-layer {
+            position: absolute; top: 0; left: 0;
+            transform-origin: 0 0; will-change: transform;
+        }
+
+        .grid-wrapper {
+            display: grid; 
+            gap: 0px;
+            background: transparent;
+            padding: 500px; 
+            width: max-content;
+            transition: gap 0.2s;
+        }
+
+        .grid-wrapper.show-grid { gap: var(--gap-size); }
+        .grid-wrapper.show-grid .slot { 
+            background: rgba(255, 255, 255, 0.03); 
+            border-radius: var(--radius);
+        }
+
+        .slot {
+            width: var(--tile-size); 
+            height: var(--tile-size);
+            background: transparent;
+            position: relative;
+        }
+
+        .pad {
+            position: absolute; inset: 2px;
+            background: linear-gradient(145deg, #3a3b40, #1e1f23);
+            border-radius: var(--radius);
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-size: 13px; font-weight: 800; text-align: center; 
+            z-index: 10; border: 1px solid #111;
+            box-shadow: 2px 3px 6px rgba(0,0,0,0.8), inset 1px 1px 1px rgba(255,255,255,0.1);
+            cursor: pointer;
+            will-change: transform, left, top;
+        }
+
+        .pad.active-play { 
+            border-color: var(--led-green); 
+            transform: scale(0.95); 
+            box-shadow: 0 0 15px var(--led-green), inset 0 0 5px rgba(0,0,0,0.5); 
+        }
+        
+        .pad.is-dragging { 
+            z-index: 9999; 
+            opacity: 0.8; 
+            transform: scale(1.1); 
+            box-shadow: 15px 20px 35px rgba(0,0,0,0.9); 
+            transition: none !important;
+        }
+
+        .pad.recording { 
+            background: linear-gradient(145deg, #a00, #600); 
+            animation: pulse-rec 0.6s infinite alternate; 
+            border-color: var(--led-red);
+        }
+
+        @keyframes pulse-rec { from { opacity: 1; } to { opacity: 0.5; } }
+
+        #controls {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 10000;
+            display: flex; gap: 15px; background: rgba(20, 20, 20, 0.8); padding: 12px 25px;
+            border-radius: 100px; border: 1px solid #444; backdrop-filter: blur(10px);
+        }
+
+        .btn-mode {
+            padding: 8px 20px; border-radius: 50px; border: 1px solid #111;
+            background: #222; color: #555; font-size: 10px; font-weight: bold; cursor: pointer;
+        }
+
+        .btn-mode.active-move { color: white; border-color: #eee; }
+        .btn-mode.active-create { color: var(--led-blue); border-color: var(--led-blue); }
+        .btn-mode.active-delete { color: var(--led-red); border-color: var(--led-red); }
+
+        #modal { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: none; justify-content: center; align-items: center; z-index: 20000; }
+        .modal-content { background: #1a1b1e; padding: 30px; border-radius: 20px; border: 1px solid #333; text-align: center; }
+        input { background: #000; color: var(--led-green); border: 1px solid #444; padding: 12px; width: 220px; text-align: center; font-size: 16px; border-radius: 10px; }
+    </style>
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#005fa8">
+    <link rel="apple-touch-icon" href="icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+</head>
+<body>
+
+    <div id="viewport">
+        <div id="pan-zoom-layer">
+            <div class="grid-wrapper" id="grid"></div>
+        </div>
+    </div>
+
+    <div id="controls">
+        <div id="createBtn" class="btn-mode" onclick="setMode('create')">CREATE</div>
+        <div id="deleteBtn" class="btn-mode" onclick="setMode('delete')">DELETE</div>
+        <div id="moveBtn" class="btn-mode active-move" onclick="setMode('move')">GRID</div>
+    </div>
+
+    <div id="modal">
+        <div class="modal-content">
+            <input type="text" id="titleInput" placeholder="NOM DU PAD">
+            <br><br>
+            <button style="padding:10px 25px; border-radius: 10px; cursor:pointer" onclick="finalizePad()">OK</button>
+        </div>
+    </div>
+
+    <script>
+        const layer = document.getElementById('pan-zoom-layer');
+        const grid = document.getElementById('grid');
+        const modal = document.getElementById('modal');
+        const viewport = document.getElementById('viewport');
+        const titleInput = document.getElementById('titleInput');
+
+        let audioCtx;
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // NOUVELLE FONCTION POUR LES BIP ET VIBRATIONS
+        function uiFeedback(type) {
+            initAudio();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            if (type === 'startRec') {
+                osc.frequency.setValueAtTime(880, audioCtx.currentTime); // La aigu
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+                if (navigator.vibrate) navigator.vibrate(40);
+            } else if (type === 'stopRec') {
+                osc.frequency.setValueAtTime(440, audioCtx.currentTime); // La grave
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+                if (navigator.vibrate) navigator.vibrate([30, 30, 30]);
+            } else if (type === 'delete') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(220, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.2);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+                if (navigator.vibrate) navigator.vibrate(100);
+            }
+        }
+
+        let scale = 1, pointX = 0, pointY = 0;
+        let currentMode = 'move', activePad = null;
+        let recorder, chunks = [], evCache = [], prevDiff = -1, prevMid = null;
+        let gridCols = 30, gridRows = 30;
+        let isDraggingTile = false;
+
+        function init() {
+            renderGrid();
+            pointX = window.innerWidth / 2 - (grid.offsetWidth / 2);
+            pointY = window.innerHeight / 2 - (grid.offsetHeight / 2);
+            updateTransform();
+        }
+
+        function renderGrid() {
+            grid.style.gridTemplateColumns = `repeat(${gridCols}, var(--tile-size))`;
+            grid.innerHTML = '';
+            for (let i = 0; i < gridCols * gridRows; i++) {
+                const slot = document.createElement('div');
+                slot.className = 'slot';
+                slot.dataset.x = i % gridCols;
+                slot.dataset.y = Math.floor(i / gridCols);
+                slot.onpointerdown = (e) => {
+                    initAudio();
+                    if (currentMode === 'create' && !slot.hasChildNodes()) {
+                        e.stopPropagation();
+                        startRecording(slot);
+                    }
+                };
+                grid.appendChild(slot);
+            }
+        }
+
+        function setMode(m) {
+            currentMode = m;
+            document.querySelectorAll('.btn-mode').forEach(b => b.classList.remove('active-move', 'active-create', 'active-delete'));
+            if(m === 'create') document.getElementById('createBtn').classList.add('active-create');
+            else if(m === 'delete') document.getElementById('deleteBtn').classList.add('active-delete');
+            else {
+                document.getElementById('moveBtn').classList.add('active-move');
+                viewport.classList.add('grabbing');
+            }
+        }
+
+        function updateTransform() {
+            layer.style.transform = `translate(${pointX}px, ${pointY}px) scale(${scale})`;
+        }
+
+        viewport.addEventListener('pointerdown', e => {
+            initAudio();
+            evCache.push(e);
+            if (currentMode === 'move') viewport.classList.add('grabbing');
+        });
+
+        viewport.addEventListener('pointermove', e => {
+            const idx = evCache.findIndex(ev => ev.pointerId === e.pointerId);
+            if (idx !== -1) evCache[idx] = e;
+
+            if (evCache.length === 2) {
+                const p1 = evCache[0], p2 = evCache[1];
+                const d = Math.sqrt((p1.clientX - p2.clientX)**2 + (p1.clientY - p2.clientY)**2);
+                const mx = (p1.clientX + p2.clientX) / 2, my = (p1.clientY + p2.clientY) / 2;
+
+                if (prevDiff > 0) {
+                    const rect = viewport.getBoundingClientRect();
+                    const viewMx = mx - rect.left;
+                    const viewMy = my - rect.top;
+                    pointX += (mx - prevMid.x);
+                    pointY += (my - prevMid.y);
+                    const os = scale;
+                    scale = Math.min(Math.max(0.1, scale * (d / prevDiff)), 5);
+                    pointX = viewMx - ((viewMx - pointX) / os) * scale;
+                    pointY = viewMy - ((viewMy - pointY) / os) * scale;
+                }
+                prevDiff = d;
+                prevMid = { x: mx, y: my };
+                updateTransform();
+            } 
+            else if (evCache.length === 1 && currentMode === 'move' && !isDraggingTile) {
+                pointX += e.movementX;
+                pointY += e.movementY;
+                updateTransform();
+            }
+        });
+
+        window.addEventListener('pointerup', e => {
+            evCache = evCache.filter(ev => ev.pointerId !== e.pointerId);
+            if (evCache.length < 2) { prevDiff = -1; prevMid = null; }
+            if (evCache.length === 0) viewport.classList.remove('grabbing');
+        });
+
+        viewport.addEventListener('wheel', e => {
+            e.preventDefault();
+            const rect = viewport.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+            const os = scale;
+            scale = Math.min(Math.max(0.1, scale + (e.deltaY * -0.001 * scale)), 5);
+            pointX = mx - ((mx - pointX) / os) * scale;
+            pointY = my - ((my - pointY) / os) * scale;
+            updateTransform();
+        }, { passive: false });
+
+        async function startRecording(slot) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                recorder = new MediaRecorder(stream);
+                chunks = [];
+                
+                const pad = document.createElement('div');
+                pad.className = 'pad recording';
+                pad.innerText = "REC";
+                slot.appendChild(pad);
+                activePad = pad;
+                
+                recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+                
+                recorder.onstop = async () => {
+                    uiFeedback('stopRec'); // SON FIN ENREGISTREMENT
+                    stream.getTracks().forEach(track => track.stop());
+                    const blob = new Blob(chunks, { type: 'audio/webm' });
+                    const reader = new FileReader();
+                    reader.onload = (e) => { pad.dataset.audio = e.target.result; };
+                    reader.readAsDataURL(blob);
+                    pad.classList.remove('recording');
+                    modal.style.display = 'flex';
+                    titleInput.focus();
+                };
+                
+                uiFeedback('startRec'); // SON DEBUT ENREGISTREMENT
+                recorder.start();
+                pad.onpointerdown = (e) => {
+                    e.stopPropagation();
+                    if (recorder && recorder.state === 'recording') recorder.stop();
+                };
+            } catch(err) { 
+                alert("Erreur micro : " + err); 
+            }
+        }
+
+        function finalizePad() {
+            const name = titleInput.value.toUpperCase() || "HIT";
+            activePad.innerText = name;
+            let span = Math.max(1, Math.ceil((name.length * 10 + 10) / 60));
+            if (span % 2 === 0) span += 1; 
+            if (span > 1) activePad.style.width = `calc(${span * 100}% + ${(span-1) * 2}px - 4px)`;
+            setupPadEvents(activePad);
+            modal.style.display = 'none';
+            titleInput.value = "";
+            setMode('move');
+        }
+
+        function setupPadEvents(pad) {
+            pad.onpointerdown = (e) => {
+                initAudio();
+                e.stopPropagation();
+                if (currentMode === 'delete') { 
+                    uiFeedback('delete'); // SON SUPPRESSION
+                    pad.remove(); 
+                    return; 
+                }
+                
+                const startX = e.clientX, startY = e.clientY;
+                let hasMoved = false;
+                let originalParent = pad.parentElement;
+
+                const onMove = (me) => {
+                    const dx = Math.round((me.clientX - startX) / (60 * scale));
+                    const dy = Math.round((me.clientY - startY) / (60 * scale));
+                    
+                    if (Math.abs(dx) > 0 || Math.abs(dy) > 0) {
+                        if (!hasMoved) {
+                            hasMoved = true;
+                            isDraggingTile = true;
+                            grid.classList.add('show-grid');
+                            pad.classList.add('is-dragging');
+                        }
+                        pad.style.transform = `translate(${dx * (60 + 2)}px, ${dy * (60 + 2)}px)`;
+                    }
+                };
+
+                const onUp = (ue) => {
+                    document.removeEventListener('pointermove', onMove);
+                    document.removeEventListener('pointerup', onUp);
+                    
+                    if (hasMoved) {
+                        pad.style.display = 'none';
+                        const target = document.elementFromPoint(ue.clientX, ue.clientY)?.closest('.slot');
+                        pad.style.display = 'flex';
+                        if (target && !target.hasChildNodes()) target.appendChild(pad);
+                        else originalParent.appendChild(pad);
+                        isDraggingTile = false;
+                        grid.classList.remove('show-grid');
+                        pad.classList.remove('is-dragging');
+                        pad.style.transform = "";
+                    } else {
+                        if(pad.dataset.audio) {
+                            fetch(pad.dataset.audio)
+                                .then(res => res.arrayBuffer())
+                                .then(buffer => audioCtx.decodeAudioData(buffer))
+                                .then(decodedData => {
+                                    const source = audioCtx.createBufferSource();
+                                    source.buffer = decodedData;
+                                    source.connect(audioCtx.destination);
+                                    pad.classList.add('active-play');
+                                    source.start(0);
+                                    source.onended = () => pad.classList.remove('active-play');
+                                });
+                        }
+                    }
+                };
+                document.addEventListener('pointermove', onMove);
+                document.addEventListener('pointerup', onUp);
+            };
+        }
+
+        init();
+    </script>
+
+    <style>
+        #pwaInstallBtn {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: #005fa8; color: white; border: none; padding: 12px 24px;
+            border-radius: 50px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            display: none; z-index: 10000; font-weight: bold; cursor: pointer;
+        }
+    </style>
+    <button id="pwaInstallBtn">Installer l'application</button>
+    <script>
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            document.getElementById('pwaInstallBtn').style.display = 'block';
+        });
+        document.getElementById('pwaInstallBtn').addEventListener('click', async () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                deferredPrompt = null;
+                document.getElementById('pwaInstallBtn').style.display = 'none';
+            }
+        });
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW error:', err));
+            });
+        }
+    </script>
+</body>
+</html>
