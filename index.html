@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SkeuoGrid Studio Pro - Smooth Motion</title>
+    <title>SkeuoGrid Studio Pro - Professional Edition</title>
     <style>
         :root {
             --tile-size: 60px;
@@ -33,97 +33,72 @@
         }
 
         .grid-wrapper {
-            display: grid; 
-            gap: 0px;
-            background: transparent;
-            padding: 500px; 
-            width: max-content;
+            display: grid; gap: 0px; background: transparent; padding: 500px; width: max-content;
         }
 
-        .grid-wrapper.show-grid { gap: var(--gap-size); }
         .grid-wrapper.show-grid .slot { 
-            background: rgba(255, 255, 255, 0.03); 
+            background: rgba(255, 255, 255, 0.05); 
+            outline: 1px solid rgba(255, 255, 255, 0.03);
             border-radius: var(--radius);
         }
 
-        .slot {
-            width: var(--tile-size); 
-            height: var(--tile-size);
-            background: transparent;
-            position: relative;
-        }
+        .slot { width: var(--tile-size); height: var(--tile-size); position: relative; }
 
-        /* PAD CLASSIQUE */
         .pad {
             position: absolute; inset: 2px;
             background: linear-gradient(145deg, #3a3b40, #1e1f23);
             border-radius: var(--radius);
             display: flex; align-items: center; justify-content: center;
-            color: #fff; font-size: 13px; font-weight: 800; text-align: center; 
+            color: #fff; font-size: 12px; font-weight: 800; text-align: center; 
             z-index: 10; border: 1px solid #111;
             box-shadow: 2px 3px 6px rgba(0,0,0,0.8), inset 1px 1px 1px rgba(255,255,255,0.1);
-            cursor: pointer;
-            will-change: transform;
+            cursor: pointer; will-change: transform;
             transition: transform 0.3s var(--anim-smooth), box-shadow 0.3s ease;
-            min-width: calc(var(--tile-size) - 4px);
             height: calc(var(--tile-size) - 4px);
         }
 
-        /* BUNDLE */
+        /* --- BUNDLE SYSTEM --- */
         .bundle {
-            position: absolute; 
-            z-index: 5;
-            display: inline-flex;
-            flex-direction: column;
-            pointer-events: none;
-            min-width: calc(var(--tile-size) * 5);
-            width: max-content;
-            will-change: transform;
-            transition: transform 0.3s var(--anim-smooth);
+            position: absolute; z-index: 5;
+            display: flex; flex-direction: column;
+            pointer-events: none; width: max-content;
+            will-change: transform; transition: transform 0.3s var(--anim-smooth);
         }
+
+        .bundle-artwork {
+            position: absolute; right: 100%; top: 0;
+            width: calc(var(--tile-size) * 2);
+            height: 100%; /* S'adapte à la hauteur du bundle */
+            margin-right: 5px; background: #222;
+            border-radius: var(--radius); border: 2px solid #444;
+            overflow: hidden; display: none; pointer-events: none;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        .bundle-artwork img { width: 100%; height: 100%; object-fit: cover; }
         
         .bundle-header {
-            height: var(--tile-size);
-            background: linear-gradient(145deg, #444, #222);
-            border: 1px solid #555;
-            border-radius: var(--radius) var(--radius) 0 0;
+            height: 30px; background: linear-gradient(145deg, #444, #222);
+            border: 1px solid #555; border-radius: var(--radius) var(--radius) 0 0;
             display: flex; align-items: center; justify-content: center;
-            color: var(--led-blue); font-size: 11px; font-weight: bold;
-            pointer-events: auto; cursor: grab;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-            width: 100%;
+            color: var(--led-blue); font-size: 10px; font-weight: bold;
+            pointer-events: auto; cursor: grab; width: 100%;
         }
 
         .bundle-body {
-            min-height: calc(var(--tile-size) * 3);
+            min-width: calc(var(--tile-size) * 2);
+            min-height: calc(var(--tile-size) * 2);
+            padding: 5px var(--tile-size) var(--tile-size) 5px; /* Colonne et ligne vide */
             background: rgba(255,255,255,0.02);
-            border: 1px dashed #444;
-            border-top: none;
+            border: 1px dashed #444; border-top: none;
             border-radius: 0 0 var(--radius) var(--radius);
-            display: flex; flex-direction: column; 
-            align-items: flex-start;
-            padding: 5px; gap: 5px;
-            pointer-events: auto;
-            width: max-content;
-            min-width: 100%;
+            display: grid; /* Grid au lieu de flex pour support multi-ligne */
+            grid-template-columns: repeat(auto-fill, var(--tile-size));
+            gap: 5px; pointer-events: auto;
         }
 
-        .bundle-body .pad {
-            position: relative;
-            inset: auto;
-            margin: 0;
-            transition: transform 0.2s var(--anim-smooth);
-        }
+        .bundle-body .pad { position: relative; inset: auto; }
 
-        /* EFFET MOBILE LORS DU DRAG */
-        .is-dragging { 
-            z-index: 9999 !important; 
-            opacity: 0.9; 
-            transform: scale(1.1) !important; 
-            box-shadow: 0 15px 30px rgba(0,0,0,0.6) !important;
-            transition: transform 0.1s linear !important; /* Réponse immédiate au doigt */
-        }
-
+        .is-dragging { z-index: 9999 !important; opacity: 0.8; pointer-events: none; }
         .pad.active-play { border-color: var(--led-green); transform: scale(0.95); box-shadow: 0 0 15px var(--led-green); }
         .pad.recording { background: linear-gradient(145deg, #a00, #600); animation: pulse-rec 0.6s infinite alternate; }
 
@@ -138,7 +113,6 @@
         .btn-mode {
             padding: 8px 15px; border-radius: 50px; border: 1px solid #111;
             background: #222; color: #555; font-size: 10px; font-weight: bold; cursor: pointer;
-            transition: all 0.2s;
         }
 
         .btn-mode.active { color: white; border-color: #eee; }
@@ -148,7 +122,7 @@
 
         #modal { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: none; justify-content: center; align-items: center; z-index: 20000; }
         .modal-content { background: #1a1b1e; padding: 30px; border-radius: 20px; border: 1px solid #333; text-align: center; }
-        input { background: #000; color: var(--led-green); border: 1px solid #444; padding: 12px; width: 220px; text-align: center; font-size: 16px; border-radius: 10px; }
+        input[type="text"] { background: #000; color: var(--led-green); border: 1px solid #444; padding: 12px; width: 220px; text-align: center; font-size: 16px; border-radius: 10px; }
     </style>
 
     <link rel="manifest" href="manifest.json">
@@ -173,11 +147,13 @@
 
     <div id="modal">
         <div class="modal-content">
-            <input type="text" id="titleInput" placeholder="NOM">
+            <input type="text" id="titleInput" placeholder="VALEUR">
             <br><br>
             <button style="padding:10px 25px; border-radius: 10px; cursor:pointer" onclick="finalizeCreation()">OK</button>
         </div>
     </div>
+
+    <input type="file" id="artPicker" accept="image/*" style="display:none">
 
     <script>
         const layer = document.getElementById('pan-zoom-layer');
@@ -185,13 +161,14 @@
         const modal = document.getElementById('modal');
         const viewport = document.getElementById('viewport');
         const titleInput = document.getElementById('titleInput');
+        const artPicker = document.getElementById('artPicker');
 
-        let audioCtx;
+        let audioCtx, recorder, chunks = [], evCache = [], prevDiff = -1;
         let scale = 1, pointX = 0, pointY = 0;
-        let currentMode = 'move', activeObj = null, creationTargetSlot = null;
-        let recorder, chunks = [], evCache = [], prevDiff = -1;
-        let gridCols = 30, gridRows = 30;
-        let isDraggingAny = false;
+        let currentMode = 'move', activeObj = null, creationTargetSlot = null, isRenaming = false;
+        let gridCols = 30, gridRows = 30, isDraggingAny = false;
+
+        const CELL_SIZE = 60;
 
         function initAudio() {
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -203,31 +180,25 @@
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
             osc.connect(gain); gain.connect(audioCtx.destination);
-            if (type === 'startRec') { osc.frequency.setValueAtTime(880, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1); osc.start(); osc.stop(audioCtx.currentTime + 0.1); }
-            else if (type === 'stopRec') { osc.frequency.setValueAtTime(440, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1); osc.start(); osc.stop(audioCtx.currentTime + 0.1); }
-            else if (type === 'delete') { osc.type = 'sawtooth'; osc.frequency.setValueAtTime(220, audioCtx.currentTime); gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.2); osc.start(); osc.stop(audioCtx.currentTime + 0.2); }
+            if (type === 'delete') { osc.type = 'sawtooth'; osc.frequency.setValueAtTime(220, audioCtx.currentTime); gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.2); osc.start(); osc.stop(audioCtx.currentTime + 0.2); }
             if (navigator.vibrate) navigator.vibrate(40);
         }
 
         function saveGrid() {
             const data = { pads: [], bundles: [] };
-            document.querySelectorAll('.pad').forEach(pad => {
-                if(!pad.closest('.bundle-body')) {
-                    data.pads.push({ name: pad.innerText, audio: pad.dataset.audio, width: pad.style.width, x: pad.parentElement.dataset.x, y: pad.parentElement.dataset.y });
-                }
+            document.querySelectorAll('.slot > .pad').forEach(pad => {
+                data.pads.push({ name: pad.innerText, audio: pad.dataset.audio, width: pad.style.width, x: pad.parentElement.dataset.x, y: pad.parentElement.dataset.y });
             });
-            document.querySelectorAll('.bundle').forEach(bun => {
+            document.querySelectorAll('.slot > .bundle').forEach(bun => {
                 const innerPads = [];
-                bun.querySelectorAll('.pad').forEach(p => {
-                    innerPads.push({ name: p.innerText, audio: p.dataset.audio, width: p.style.width });
-                });
-                data.bundles.push({ name: bun.querySelector('.bundle-header').innerText, x: bun.parentElement.dataset.x, y: bun.parentElement.dataset.y, pads: innerPads });
+                bun.querySelectorAll('.pad').forEach(p => innerPads.push({ name: p.innerText, audio: p.dataset.audio, width: p.style.width }));
+                data.bundles.push({ name: bun.querySelector('.bundle-header').innerText, x: bun.parentElement.dataset.x, y: bun.parentElement.dataset.y, pads: innerPads, image: bun.querySelector('.bundle-artwork img').src });
             });
-            localStorage.setItem('skeuoGridData_V5', JSON.stringify(data));
+            localStorage.setItem('skeuoGridData_V7', JSON.stringify(data));
         }
 
         function loadGrid() {
-            const raw = localStorage.getItem('skeuoGridData_V5');
+            const raw = localStorage.getItem('skeuoGridData_V7');
             if (!raw) return;
             const data = JSON.parse(raw);
             data.pads.forEach(p => {
@@ -238,6 +209,10 @@
                 const slot = document.querySelector(`.slot[data-x="${b.x}"][data-y="${b.y}"]`);
                 if(slot) {
                     const bun = createBundleUI(slot, b.name);
+                    if(b.image && b.image.includes('data:image')) {
+                        bun.querySelector('.bundle-artwork').style.display = 'block';
+                        bun.querySelector('.bundle-artwork img').src = b.image;
+                    }
                     b.pads.forEach(ip => {
                         const pUI = createPadUI(null, ip.name, ip.audio, ip.width);
                         bun.querySelector('.bundle-body').appendChild(pUI);
@@ -246,63 +221,22 @@
             });
         }
 
-        function init() {
-            renderGrid();
-            loadGrid();
-            pointX = window.innerWidth / 2 - (grid.offsetWidth / 2);
-            pointY = window.innerHeight / 2 - (grid.offsetHeight / 2);
-            updateTransform();
-        }
-
         function renderGrid() {
             grid.style.gridTemplateColumns = `repeat(${gridCols}, var(--tile-size))`;
-            grid.innerHTML = '';
             for (let i = 0; i < gridCols * gridRows; i++) {
                 const slot = document.createElement('div');
                 slot.className = 'slot';
                 slot.dataset.x = i % gridCols; slot.dataset.y = Math.floor(i / gridCols);
                 slot.onpointerdown = (e) => {
-                    initAudio();
                     if (currentMode === 'create' && !slot.hasChildNodes()) {
                         e.stopPropagation(); creationTargetSlot = slot; startRecording(slot);
                     } else if (currentMode === 'bundle' && !slot.hasChildNodes()){
-                        e.stopPropagation(); creationTargetSlot = slot; modal.style.display = 'flex'; titleInput.focus();
+                        e.stopPropagation(); creationTargetSlot = slot; isRenaming = false; modal.style.display = 'flex'; titleInput.focus();
                     }
                 };
                 grid.appendChild(slot);
             }
         }
-
-        function setMode(m) {
-            currentMode = m;
-            document.querySelectorAll('.btn-mode').forEach(b => b.classList.remove('active', 'active-create', 'active-delete', 'active-bundle'));
-            if(m === 'create') document.getElementById('createBtn').classList.add('active-create');
-            else if(m === 'delete') document.getElementById('deleteBtn').classList.add('active-delete');
-            else if(m === 'bundle') document.getElementById('bundleBtn').classList.add('active-bundle');
-            else document.getElementById('moveBtn').classList.add('active');
-        }
-
-        function updateTransform() { layer.style.transform = `translate(${pointX}px, ${pointY}px) scale(${scale})`; }
-
-        viewport.onpointerdown = e => { initAudio(); evCache.push(e); if (currentMode === 'move') viewport.classList.add('grabbing'); };
-        viewport.onpointermove = e => {
-            const idx = evCache.findIndex(ev => ev.pointerId === e.pointerId); if (idx !== -1) evCache[idx] = e;
-            if (evCache.length === 2) {
-                const p1 = evCache[0], p2 = evCache[1];
-                const d = Math.sqrt((p1.clientX - p2.clientX)**2 + (p1.clientY - p2.clientY)**2);
-                const mx = (p1.clientX + p2.clientX) / 2, my = (p1.clientY + p2.clientY) / 2;
-                if (prevDiff > 0) {
-                    const rect = viewport.getBoundingClientRect();
-                    const os = scale; scale = Math.min(Math.max(0.1, scale * (d / prevDiff)), 5);
-                    pointX = (mx - rect.left) - (((mx - rect.left) - pointX) / os) * scale;
-                    pointY = (my - rect.top) - (((my - rect.top) - pointY) / os) * scale;
-                }
-                prevDiff = d; updateTransform();
-            } else if (evCache.length === 1 && currentMode === 'move' && !isDraggingAny) {
-                pointX += e.movementX; pointY += e.movementY; updateTransform();
-            }
-        };
-        window.onpointerup = e => { evCache = evCache.filter(ev => ev.pointerId !== e.pointerId); if (evCache.length < 2) { prevDiff = -1; } viewport.classList.remove('grabbing'); };
 
         async function startRecording(slot) {
             try {
@@ -310,31 +244,37 @@
                 recorder = new MediaRecorder(stream); chunks = [];
                 const pad = createPadUI(slot, "REC", null, null);
                 pad.classList.add('recording'); activeObj = pad;
-                recorder.ondataavailable = e => chunks.push(e.data);
                 recorder.onstop = () => {
-                    uiFeedback('stopRec'); stream.getTracks().forEach(t => t.stop());
                     const reader = new FileReader();
-                    reader.onload = (e) => { pad.dataset.audio = e.target.result; saveGrid(); };
+                    reader.onload = (e) => { pad.dataset.audio = e.target.result; };
                     reader.readAsDataURL(new Blob(chunks));
-                    pad.classList.remove('recording'); modal.style.display = 'flex';
+                    pad.classList.remove('recording'); isRenaming = false; modal.style.display = 'flex';
                 };
-                uiFeedback('startRec'); recorder.start();
-                pad.onpointerdown = (e) => { e.stopPropagation(); if(recorder.state==='recording') recorder.stop(); };
+                recorder.ondataavailable = e => chunks.push(e.data);
+                recorder.start();
+                pad.onpointerdown = e => { e.stopPropagation(); if(recorder.state==='recording') recorder.stop(); };
             } catch(e) { alert("Micro requis"); }
         }
 
         function finalizeCreation() {
             const name = titleInput.value.toUpperCase() || "NEW";
-            if (currentMode === 'create') {
+            if (isRenaming) {
                 activeObj.innerText = name;
-                let span = Math.max(1, Math.ceil((name.length * 10 + 10) / 60));
-                if (span % 2 === 0) span += 1;
-                activeObj.style.width = `calc(${span * 60}px - 4px)`;
+                updatePadSize(activeObj, name);
+            } else if (currentMode === 'create') {
+                activeObj.innerText = name;
+                updatePadSize(activeObj, name);
                 setupPadEvents(activeObj);
             } else if (currentMode === 'bundle') {
                 createBundleUI(creationTargetSlot, name);
             }
             modal.style.display = 'none'; titleInput.value = ""; setMode('move'); saveGrid();
+        }
+
+        function updatePadSize(pad, text) {
+            let span = Math.max(1, Math.ceil((text.length * 9 + 15) / 60));
+            pad.style.width = `calc(${span * 60}px - 4px)`;
+            pad.style.gridColumnEnd = `span ${span}`;
         }
 
         function createPadUI(slot, name, audio, width) {
@@ -350,36 +290,42 @@
         function createBundleUI(slot, name) {
             const bun = document.createElement('div');
             bun.className = 'bundle';
-            bun.innerHTML = `<div class="bundle-header">${name}</div><div class="bundle-body"></div>`;
+            bun.innerHTML = `<div class="bundle-artwork"><img></div><div class="bundle-header">${name}</div><div class="bundle-body"></div>`;
             slot.appendChild(bun);
             setupBundleEvents(bun);
             return bun;
         }
 
         function setupPadEvents(pad) {
+            let pressTimer;
             pad.onpointerdown = (e) => {
                 initAudio(); e.stopPropagation();
                 if (currentMode === 'delete') { uiFeedback('delete'); pad.remove(); saveGrid(); return; }
-                if (currentMode !== 'move' && !pad.closest('.bundle-body')) {
-                     // Mode spécial drag-drop
-                }
                 
+                // Long press pour renommer
+                pressTimer = setTimeout(() => {
+                    activeObj = pad; isRenaming = true;
+                    titleInput.value = pad.innerText;
+                    modal.style.display = 'flex';
+                }, 600);
+
                 const startX = e.clientX, startY = e.clientY;
-                let hasMoved = false, originalParent = pad.parentElement;
+                let hasMoved = false, currentDx = 0, currentDy = 0;
 
                 const onMove = (me) => {
                     const dx = (me.clientX - startX) / scale;
                     const dy = (me.clientY - startY) / scale;
                     if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
-                        if (!hasMoved) { 
-                            hasMoved = true; isDraggingAny = true; 
-                            grid.classList.add('show-grid'); pad.classList.add('is-dragging'); 
-                        }
-                        pad.style.transform = `translate(${dx}px, ${dy}px) scale(1.1)`;
+                        clearTimeout(pressTimer);
+                        if (!hasMoved) { hasMoved = true; isDraggingAny = true; grid.classList.add('show-grid'); pad.classList.add('is-dragging'); }
+                        currentDx = Math.round(dx / CELL_SIZE) * CELL_SIZE;
+                        currentDy = Math.round(dy / CELL_SIZE) * CELL_SIZE;
+                        pad.style.transform = `translate(${currentDx}px, ${currentDy}px) scale(1.1)`;
                     }
                 };
 
                 const onUp = (ue) => {
+                    clearTimeout(pressTimer);
                     document.removeEventListener('pointermove', onMove); document.removeEventListener('pointerup', onUp);
                     if (hasMoved) {
                         pad.style.visibility = 'hidden';
@@ -387,29 +333,16 @@
                         const slot = target?.closest('.slot');
                         const bundleBody = target?.closest('.bundle-body');
                         pad.style.visibility = 'visible'; 
-                        
-                        // Animation de retour / placement
-                        pad.style.transition = `transform 0.4s var(--anim-smooth)`;
-                        pad.style.transform = "translate(0, 0) scale(1)";
-
-                        setTimeout(() => {
-                            if (bundleBody) bundleBody.appendChild(pad);
-                            else if (slot && !slot.hasChildNodes()) slot.appendChild(pad);
-                            else originalParent.appendChild(pad);
-                            
-                            pad.style.transition = ""; 
-                            isDraggingAny = false; 
-                            grid.classList.remove('show-grid'); 
-                            pad.classList.remove('is-dragging');
-                            saveGrid();
-                        }, 50);
-                    } else {
-                        if(pad.dataset.audio) {
-                            fetch(pad.dataset.audio).then(res => res.arrayBuffer()).then(buf => audioCtx.decodeAudioData(buf)).then(decoded => {
-                                const s = audioCtx.createBufferSource(); s.buffer = decoded; s.connect(audioCtx.destination);
-                                pad.classList.add('active-play'); s.start(0); s.onended = () => pad.classList.remove('active-play');
-                            });
-                        }
+                        pad.style.transform = "none";
+                        if (bundleBody) bundleBody.appendChild(pad);
+                        else if (slot && !slot.hasChildNodes()) slot.appendChild(pad);
+                        isDraggingAny = false; grid.classList.remove('show-grid'); pad.classList.remove('is-dragging');
+                        saveGrid();
+                    } else if (!isRenaming && pad.dataset.audio) {
+                        fetch(pad.dataset.audio).then(res => res.arrayBuffer()).then(buf => audioCtx.decodeAudioData(buf)).then(decoded => {
+                            const s = audioCtx.createBufferSource(); s.buffer = decoded; s.connect(audioCtx.destination);
+                            pad.classList.add('active-play'); s.start(0); s.onended = () => pad.classList.remove('active-play');
+                        });
                     }
                 };
                 document.addEventListener('pointermove', onMove); document.addEventListener('pointerup', onUp);
@@ -418,51 +351,89 @@
 
         function setupBundleEvents(bun) {
             const header = bun.querySelector('.bundle-header');
+            header.onclick = () => {
+                if (currentMode === 'move') {
+                    artPicker.onchange = (f) => {
+                        const file = f.target.files[0];
+                        if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (re) => {
+                                const art = bun.querySelector('.bundle-artwork');
+                                art.style.display = 'block';
+                                art.querySelector('img').src = re.target.result;
+                                saveGrid();
+                            };
+                            reader.readAsDataURL(file);
+                        }
+                    };
+                    artPicker.click();
+                }
+            };
+
             header.onpointerdown = (e) => {
                 e.stopPropagation();
                 if (currentMode === 'delete') { uiFeedback('delete'); bun.remove(); saveGrid(); return; }
                 const startX = e.clientX, startY = e.clientY;
-                let hasMoved = false, originalParent = bun.parentElement;
-
+                let hasMoved = false, currentDx = 0, currentDy = 0;
                 const onMove = (me) => {
                     const dx = (me.clientX - startX) / scale;
                     const dy = (me.clientY - startY) / scale;
                     if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
-                        if (!hasMoved) { 
-                            hasMoved = true; isDraggingAny = true; 
-                            grid.classList.add('show-grid'); bun.classList.add('is-dragging'); 
-                        }
-                        bun.style.transform = `translate(${dx}px, ${dy}px) scale(1.05)`;
+                        if (!hasMoved) { hasMoved = true; isDraggingAny = true; grid.classList.add('show-grid'); bun.classList.add('is-dragging'); }
+                        currentDx = Math.round(dx / CELL_SIZE) * CELL_SIZE;
+                        currentDy = Math.round(dy / CELL_SIZE) * CELL_SIZE;
+                        bun.style.transform = `translate(${currentDx}px, ${currentDy}px) scale(1.05)`;
                     }
                 };
-
                 const onUp = (ue) => {
                     document.removeEventListener('pointermove', onMove); document.removeEventListener('pointerup', onUp);
                     if (hasMoved) {
                         bun.style.visibility = 'hidden';
                         const slot = document.elementFromPoint(ue.clientX, ue.clientY)?.closest('.slot');
-                        bun.style.visibility = 'visible';
-
-                        bun.style.transition = `transform 0.4s var(--anim-smooth)`;
-                        bun.style.transform = "translate(0, 0) scale(1)";
-
-                        setTimeout(() => {
-                            if (slot && !slot.hasChildNodes()) slot.appendChild(bun);
-                            else originalParent.appendChild(bun);
-                            
-                            bun.style.transition = "";
-                            isDraggingAny = false; 
-                            grid.classList.remove('show-grid'); 
-                            bun.classList.remove('is-dragging');
-                            saveGrid();
-                        }, 50);
+                        bun.style.visibility = 'visible'; bun.style.transform = "none";
+                        if (slot && !slot.hasChildNodes()) slot.appendChild(bun);
+                        isDraggingAny = false; grid.classList.remove('show-grid'); bun.classList.remove('is-dragging');
+                        saveGrid();
                     }
                 };
                 document.addEventListener('pointermove', onMove); document.addEventListener('pointerup', onUp);
             };
         }
 
-        init();
+        function setMode(m) {
+            currentMode = m;
+            document.querySelectorAll('.btn-mode').forEach(b => b.classList.remove('active', 'active-create', 'active-delete', 'active-bundle'));
+            document.getElementById(m+'Btn')?.classList.add('active-'+m);
+            if(m === 'move') document.getElementById('moveBtn').classList.add('active');
+        }
+
+        function updateTransform() { layer.style.transform = `translate(${pointX}px, ${pointY}px) scale(${scale})`; }
+
+        viewport.onpointerdown = e => { if (currentMode === 'move') viewport.classList.add('grabbing'); evCache.push(e); };
+        viewport.onpointermove = e => {
+            const idx = evCache.findIndex(ev => ev.pointerId === e.pointerId); if (idx !== -1) evCache[idx] = e;
+            if (evCache.length === 2) {
+                const p1 = evCache[0], p2 = evCache[1];
+                const d = Math.sqrt((p1.clientX - p2.clientX)**2 + (p1.clientY - p2.clientY)**2);
+                if (prevDiff > 0) {
+                    const os = scale; scale = Math.min(Math.max(0.1, scale * (d / prevDiff)), 5);
+                    const mx = (p1.clientX + p2.clientX) / 2, my = (p1.clientY + p2.clientY) / 2;
+                    pointX = mx - ((mx - pointX) / os) * scale;
+                    pointY = my - ((my - pointY) / os) * scale;
+                    updateTransform();
+                }
+                prevDiff = d;
+            } else if (evCache.length === 1 && currentMode === 'move' && !isDraggingAny) {
+                pointX += e.movementX; pointY += e.movementY; updateTransform();
+            }
+        };
+        window.onpointerup = e => { evCache = evCache.filter(ev => ev.pointerId !== e.pointerId); if (evCache.length < 2) prevDiff = -1; viewport.classList.remove('grabbing'); };
+
+        renderGrid();
+        loadGrid();
+        pointX = window.innerWidth / 2 - (grid.offsetWidth / 2);
+        pointY = window.innerHeight / 2 - (grid.offsetHeight / 2);
+        updateTransform();
     </script>
 
     <style>
